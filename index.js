@@ -12,12 +12,22 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 
 // Criar tabela e inserir dados vulneráveis
+// db.serialize(() => {
+//    db.run("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)");
+//    db.run("INSERT INTO users (username, password) VALUES ('admin', 'admin123')");
+//    db.run("INSERT INTO users (username, password) VALUES ('user', 'user123')");
+//    db.run("CREATE TABLE flags (id INTEGER PRIMARY KEY, flag TEXT)");
+//    db.run("INSERT INTO flags (flag) VALUES ('VULCOM{SQLi_Exploit_Success}')");
+//});
+
+// Criar tabela e inserir dados vulneráveis
 db.serialize(() => {
     db.run("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)");
-    db.run("INSERT INTO users (username, password) VALUES ('admin', 'admin123')");
-    db.run("INSERT INTO users (username, password) VALUES ('user', 'user123')");
+    db.run("INSERT INTO users (username, password) VALUES (?, ?)", ['admin', 'admin123']);
+    db.run("INSERT INTO users (username, password) VALUES (?, ?)", ['user', 'user123']);
+
     db.run("CREATE TABLE flags (id INTEGER PRIMARY KEY, flag TEXT)");
-    db.run("INSERT INTO flags (flag) VALUES ('VULCOM{SQLi_Exploit_Success}')");
+    db.run("INSERT INTO flags (flag) VALUES (?)", ['VULCOM{SQLi_Exploit_Success}']);
 });
 
 // Rota de login com SQL Injection
@@ -27,18 +37,27 @@ app.get('/', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    
+
     // CONSULTA SQL VULNERÁVEL 🚨
-    const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
-    
-    db.all(query, [], (err, rows) => {
+    // const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
+  
+    // CORREÇÃO: query parametrizada
+    const query = `SELECT * FROM users WHERE username = ? AND password = ?`;
+
+    db.all(query, [username, password], (err, rows) => {
         if (err) {
-            return res.send('Erro no servidor');
+            // return res.send('Erro no servidor');
+            console.error('Erro SQL:', err.message);
+            return res.status(500).send('Erro no servidor');
         }
+
+
+        console.log('CONSULTA: ', query);
+        //console.log('RESULTADO:', rows);   
+        console.log('RESULTADO:', [username, password]);
+        //return res.send(`Bem-vindo, ${username}! <br> Flag: VULCOM{SQLi_Exploit_Success}`);
         if (rows.length > 0) {
-            console.log('CONSULTA: ', query);
-            console.log('RESULTADO:', rows);
-            return res.send(`Bem-vindo, ${username}! <br> Flag: VULCOM{SQLi_Exploit_Success}`);
+            return res.send(`Bem-vindo, ${rows[0].username}!`);
         } else {
             return res.send('Login falhou!');
         }
